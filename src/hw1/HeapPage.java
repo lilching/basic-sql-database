@@ -1,3 +1,5 @@
+//Laney Ching & Katherine Zhou
+
 package hw1;
 
 import java.io.ByteArrayInputStream;
@@ -6,6 +8,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -45,8 +48,7 @@ public class HeapPage {
 	}
 
 	public int getId() {
-		//your code here
-		return 0;
+		return id;
 	}
 
 	/**
@@ -55,17 +57,16 @@ public class HeapPage {
 	 * @return number of slots on this page
 	 */
 	public int getNumSlots() {
-		//your code here
-		return 0;
+		return (8 * HeapFile.PAGE_SIZE) / (8 * td.getSize() + 1);
 	}
 
 	/**
 	 * Computes the size of the header. Headers must be a whole number of bytes (no partial bytes)
 	 * @return size of header in bytes
 	 */
-	private int getHeaderSize() {        
-		//your code here
-		return 0;
+	private int getHeaderSize() {   
+		int num = getNumSlots();
+		return num / 8 + (num % 8 == 0 ? 0 : 1);
 	}
 
 	/**
@@ -74,8 +75,10 @@ public class HeapPage {
 	 * @return true if occupied
 	 */
 	public boolean slotOccupied(int s) {
-		//your code here
-		return false;
+		int index = s/8;
+		byte block =  header[index];
+		return (((block >> (s % 8)) & 1)==1);
+		
 	}
 
 	/**
@@ -84,17 +87,48 @@ public class HeapPage {
 	 * @param value its occupied status
 	 */
 	public void setSlotOccupied(int s, boolean value) {
-		//your code here
+		int index = s/8;
+		int shift = s%8;
+		byte block =  header[index];
+		byte negate = (byte) ~(1 << shift);
+		block = (byte) (block & negate);
+		byte square = (byte) ((value ? 1 : 0) << shift);
+		header[index] = (byte)(block | square);
 	}
 	
 	/**
 	 * Adds the given tuple in the next available slot. Throws an exception if no empty slots are available.
 	 * Also throws an exception if the given tuple does not have the same structure as the tuples within the page.
 	 * @param t the tuple to be added.
+	 * @return true if the tuple could be added, false otherwise
 	 * @throws Exception
 	 */
-	public void addTuple(Tuple t) throws Exception {
-		//your code here
+	public boolean addTuple(Tuple t) throws Exception {
+		if(!td.equals(t.getDesc())) {
+			throw new Exception("Tuple desc does not match.");
+		}
+		
+		int hsize = getHeaderSize();
+		for (int i = 0; i < hsize; i++) {
+			byte block = header[i];
+			byte full_block;
+			if (i == hsize - 1) {
+				full_block = (byte) ((1 << (((getNumSlots() - 1) & 0x7) + 1)) - 1);
+			}
+			else {
+				full_block = (byte) 0xff;
+			}
+			if (block != full_block) {
+				int x = Integer.numberOfTrailingZeros(~block);
+				header[i] = (byte) (block | (1 << x));
+				int tup = 8*i+x;
+				tuples[tup] = t;
+				t.setId(tup);
+				t.setPid(getId());
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -104,7 +138,11 @@ public class HeapPage {
 	 * @throws Exception
 	 */
 	public void deleteTuple(Tuple t) {
-		//your code here
+		int tup = t.getId();
+		setSlotOccupied(tup, false);
+		
+		//this is unnecessary but will avoid dangling references
+		tuples[tup]=null;
 	}
 	
 	/**
@@ -231,7 +269,6 @@ public class HeapPage {
 	 * @return
 	 */
 	public Iterator<Tuple> iterator() {
-		//your code here
-		return null;
+		return new ArrayList<Tuple>(Arrays.asList(tuples)).stream().filter(t -> t != null).iterator();
 	}
 }

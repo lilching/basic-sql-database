@@ -1,6 +1,5 @@
+//Laney Ching & Katherine Zhou
 package hw1;
-
-import java.io.*;
 
 import hw4.BufferPool;
 
@@ -20,12 +19,10 @@ import hw4.BufferPool;
 public class Database {
 	private static Database _instance = new Database();
 	private final Catalog _catalog;
-	private BufferPool _bufferpool; 
-
+	private static BufferPool _pool = new BufferPool(BufferPool.DEFAULT_PAGES);
 
 	private Database() {
 		_catalog = new Catalog();
-		_bufferpool = new BufferPool(BufferPool.DEFAULT_PAGES);
 	}
 
 	/** Return the catalog of the static Database instance*/
@@ -33,22 +30,19 @@ public class Database {
 		return _instance._catalog;
 	}
 
-	/** Return the buffer pool of the static Database instance*/
-	public static BufferPool getBufferPool() {
-		return _instance._bufferpool;
-	}
-
-	/** Method used for testing -- create a new instance of the
-    buffer pool and return it
-	 */
-	public static BufferPool resetBufferPool(int pages) {
-		_instance._bufferpool = new BufferPool(pages);
-		return _instance._bufferpool;
-	}
 
 	//reset the database, used for unit tests only.
 	public static void reset() {
 		_instance = new Database();
+	}
+	
+	public static BufferPool getBufferPool() {
+		return _pool;
+	}
+	
+	public static BufferPool resetBufferPool(int nPages) {
+		_pool = new BufferPool(nPages);
+		return _pool;
 	}
 
 }

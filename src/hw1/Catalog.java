@@ -1,3 +1,4 @@
+//Laney Ching & Katherine Zhou
 package hw1;
 
 import java.io.BufferedReader;
@@ -16,12 +17,28 @@ import java.util.*;
 
 public class Catalog {
 	
+	private class Table {
+		HeapFile file;
+		String pkeyField;
+		String name;
+		
+		Table(HeapFile file, String pkeyField, String name) {
+			this.file = file;
+			this.pkeyField = pkeyField;
+			this.name = name;
+		}
+	}
+	
+	HashMap<String, Table> map;
+	HashMap<Integer, Table> idMap;
+	
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-    	//your code here
+    	map = new HashMap<>();
+    	idMap = new HashMap<>();
     }
 
     /**
@@ -33,7 +50,9 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(HeapFile file, String name, String pkeyField) {
-    	//your code here
+    	Table t = new Table(file, pkeyField, name);
+    	map.put(name, t);
+    	idMap.put(file.getId(), t);
     }
 
     public void addTable(HeapFile file, String name) {
@@ -45,8 +64,7 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) {
-    	//your code here
-    	return 0;
+    	return map.get(name).file.getId();
     }
 
     /**
@@ -55,8 +73,7 @@ public class Catalog {
      *     function passed to addTable
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-    	//your code here
-    	return null;
+    	return getDbFile(tableid).getTupleDesc();
     }
 
     /**
@@ -66,28 +83,34 @@ public class Catalog {
      *     function passed to addTable
      */
     public HeapFile getDbFile(int tableid) throws NoSuchElementException {
-    	//your code here
-    	return null;
+    	Table t = idMap.getOrDefault(tableid, null);
+    	if (t == null) {
+    		throw new NoSuchElementException("No such table with id " + tableid);
+    	}
+    	return t.file;
     }
 
     /** Delete all tables from the catalog */
     public void clear() {
-    	//your code here
+    	map.clear();
+    	idMap.clear();
     }
 
     public String getPrimaryKey(int tableid) {
-    	//your code here
-    	return null;
+    	Table t = idMap.getOrDefault(tableid, null);
+    	if (t == null) {
+    		throw new NoSuchElementException("No such table with id " + tableid);
+    	}
+    	return t.pkeyField;
     }
 
     public Iterator<Integer> tableIdIterator() {
-    	//your code here
-    	return null;
+    	return idMap.keySet().iterator();
     }
 
     public String getTableName(int id) {
-    	//your code here
-    	return null;
+    	Table t = idMap.get(id);
+    	return t.name;
     }
     
     /**

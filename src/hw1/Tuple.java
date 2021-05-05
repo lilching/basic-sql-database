@@ -1,3 +1,4 @@
+//Laney Ching & Katherine Zhou
 package hw1;
 
 import java.sql.Types;
@@ -11,17 +12,22 @@ import java.util.HashMap;
  */
 public class Tuple {
 	
+	Field fields[];
+	TupleDesc td;
+	int pid;
+	int id;
+	
 	/**
 	 * Creates a new tuple with the given description
 	 * @param t the schema for this tuple
 	 */
 	public Tuple(TupleDesc t) {
-		//your code here
+		td = t;
+		fields = new Field[t.numFields()];
 	}
 	
 	public TupleDesc getDesc() {
-		//your code here
-		return null;
+		return td;
 	}
 	
 	/**
@@ -29,12 +35,11 @@ public class Tuple {
 	 * @return the page id of this tuple
 	 */
 	public int getPid() {
-		//your code here
-		return 0;
+		return pid;
 	}
 
 	public void setPid(int pid) {
-		//your code here
+		this.pid = pid;
 	}
 
 	/**
@@ -42,16 +47,15 @@ public class Tuple {
 	 * @return the slot where this tuple is stored
 	 */
 	public int getId() {
-		//your code here
-		return 0;
+		return id;
 	}
 
 	public void setId(int id) {
-		//your code here
+		this.id = id;
 	}
 	
 	public void setDesc(TupleDesc td) {
-		//your code here;
+		this.td = td;
 	}
 	
 	/**
@@ -60,12 +64,27 @@ public class Tuple {
 	 * @param v the data
 	 */
 	public void setField(int i, Field v) {
-		//your code here
+		fields[i] = v;
 	}
 	
 	public Field getField(int i) {
-		//your code here
-		return null;
+		return fields[i];
+	}
+	
+	public boolean equals(Object o) {
+		if (!(o instanceof Tuple)) {
+			return false;
+		}
+		Tuple t = (Tuple) o;
+		if (!t.td.equals(td)) {
+			return false;
+		}
+		for (int i = 0; i < td.numFields(); i++) {
+			if (!fields[i].compare(RelationalOperator.EQ, t.fields[i])) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	/**
@@ -74,8 +93,26 @@ public class Tuple {
 	 * the String columns to readable text).
 	 */
 	public String toString() {
-		//your code here
-		return "";
+		String s = "";
+    	int n = td.numFields();
+    	for (int i = 0; i < n; i++) {
+    		switch (td.getType(i)) {
+    			case INT: {
+    				IntField f = (IntField) fields[i];
+    				s += f;
+    				break;
+    			}
+    			case STRING: {
+    				StringField f = (StringField) fields[i];
+    				s += f;
+    				break;
+    			}
+    		}
+    		if (i != n - 1) {
+    			s += ", ";
+    		}
+    	}
+    	return s;
 	}
 }
 	

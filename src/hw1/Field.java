@@ -1,3 +1,4 @@
+//Laney Ching & Katherine Zhou
 package hw1;
 
 import java.io.*;

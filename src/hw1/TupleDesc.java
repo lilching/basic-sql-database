@@ -1,3 +1,4 @@
+//Laney Ching & Katherine Zhou
 package hw1;
 import java.util.*;
 
@@ -18,15 +19,16 @@ public class TupleDesc {
      * @param fieldAr array specifying the names of the fields. Note that names may be null.
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
-    	//your code here
+    	assert(typeAr.length == fieldAr.length);
+    	types = typeAr;
+    	fields = fieldAr;
     }
 
     /**
      * @return the number of fields in this TupleDesc
      */
     public int numFields() {
-        //your code here
-    	return 0;
+    	return fields.length;
     }
 
     /**
@@ -37,8 +39,10 @@ public class TupleDesc {
      * @throws NoSuchElementException if i is not a valid field reference.
      */
     public String getFieldName(int i) throws NoSuchElementException {
-        //your code here
-    	return null;
+    	if (i >= 0 && i < numFields()) {
+    		return fields[i];
+    	}
+    	throw new NoSuchElementException("Index " + i + " out of bounds");
     }
 
     /**
@@ -49,8 +53,13 @@ public class TupleDesc {
      * @throws NoSuchElementException if no field with a matching name is found.
      */
     public int nameToId(String name) throws NoSuchElementException {
-        //your code here
-    	return 0;
+    	int n = numFields();
+    	for (int i = 0; i < n; i++) {
+    		if (name.equals(getFieldName(i))) {
+    			return i;
+    		}
+    	}
+    	throw new NoSuchElementException("No such field \"" + name + "\"");
     }
 
     /**
@@ -61,8 +70,10 @@ public class TupleDesc {
      * @throws NoSuchElementException if i is not a valid field reference.
      */
     public Type getType(int i) throws NoSuchElementException {
-        //your code here
-    	return null;
+    	if (i >= 0 && i < numFields()) {
+    		return types[i];
+    	}
+    	throw new NoSuchElementException("Index " + i + " out of bounds");
     }
 
     /**
@@ -70,8 +81,19 @@ public class TupleDesc {
      * Note that tuples from a given TupleDesc are of a fixed size.
      */
     public int getSize() {
-    	//your code here
-    	return 0;
+    	int totalSize = 0;
+    	int n = numFields();
+    	for (int i = 0; i < n; i++) {
+    		switch (getType(i)) {
+    			case INT:
+    				totalSize += 4;
+    				break;
+    			case STRING:
+    				totalSize += 129;
+    				break;
+    		}
+    	}
+    	return totalSize;
     }
 
     /**
@@ -83,8 +105,20 @@ public class TupleDesc {
      * @return true if the object is equal to this TupleDesc.
      */
     public boolean equals(Object o) {
-    	//your code here
-    	return false;
+    	if (!(o instanceof TupleDesc)) {
+    		return false;
+    	}
+    	TupleDesc td = (TupleDesc) o;
+    	int n = numFields();
+    	if (n != td.numFields()) {
+    		return false;
+    	}
+    	for (int i = 0; i < n; i++) {
+    		if (getType(i) != td.getType(i)) {
+    			return false;
+    		}
+    	}
+    	return true;
     }
     
 
@@ -101,7 +135,22 @@ public class TupleDesc {
      * @return String describing this descriptor.
      */
     public String toString() {
-        //your code here
-    	return "";
+    	String s = "";
+    	int n = numFields();
+    	for (int i = 0; i < n; i++) {
+    		switch (getType(i)) {
+    			case INT:
+    				s += "INT";
+    				break;
+    			case STRING:
+    				s += "STRING";
+    				break;
+    		}
+    		s += "(" + getFieldName(i) + ")";
+    		if (i != n - 1) {
+    			s += ", ";
+    		}
+    	}
+    	return s;
     }
 }
