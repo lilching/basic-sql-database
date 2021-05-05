@@ -298,6 +298,9 @@ public class HW4Tests {
 		bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
 		HeapPage hp = bp.getPage(1, tid, 0, Permissions.READ_ONLY);
 		Iterator<Tuple> it = hp.iterator();
+		while (it.hasNext()) {
+			System.out.println(it.next());
+		}
 		assertFalse("Deletion failed", it.hasNext());
 
 

@@ -98,12 +98,12 @@ public class HeapFile {
 	 * @param t The tuple to be stored
 	 * @return The HeapPage that contains the tuple
 	 */
+	@Deprecated
 	public HeapPage addTuple(Tuple t) {
 		for (int i = 0; i < getNumPages(); i++) {
 			try {
 				HeapPage page = readPage(i);
 				if(page.addTuple(t)) {
-					writePage(page);
 					return page;
 				}
 			} catch (Exception e) {
@@ -118,7 +118,6 @@ public class HeapFile {
 			e.printStackTrace();
 			return null;
 		}
-		writePage(hpage);
 		return hpage;
 		
 	}
@@ -128,6 +127,7 @@ public class HeapFile {
 	 * from the proper HeapPage. It then writes the modified page to disk.
 	 * @param t the Tuple to be deleted
 	 */
+	@Deprecated
 	public void deleteTuple(Tuple t){
 		HeapPage p = readPage(t.getPid());
 		p.setSlotOccupied(t.getId(), false);
@@ -139,6 +139,7 @@ public class HeapFile {
 	 * access each HeapPage to do this (see iterator() in HeapPage)
 	 * @return
 	 */
+	@Deprecated
 	public ArrayList<Tuple> getAllTuples() {
 		ArrayList<Tuple> ret = new ArrayList<>();
 		for (int i = 0; i < getNumPages(); i++) {
