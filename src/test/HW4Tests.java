@@ -280,7 +280,6 @@ public class HW4Tests {
 	
 	@Test
 	public void testhfRemove() throws Exception {
-
 		bp.getPage(0, tid, 0, Permissions.READ_WRITE);
 		Tuple t = new Tuple(td);
 		t.setField(0, new IntField(new byte[] {0, 0, 0, (byte)131}));
@@ -298,9 +297,6 @@ public class HW4Tests {
 		bp = Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
 		HeapPage hp = bp.getPage(1, tid, 0, Permissions.READ_ONLY);
 		Iterator<Tuple> it = hp.iterator();
-		while (it.hasNext()) {
-			System.out.println(it.next());
-		}
 		assertFalse("Deletion failed", it.hasNext());
 
 

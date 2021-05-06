@@ -63,16 +63,14 @@ public class BufferPool {
 	
 	private void get_lock(int cache_idx, Permissions perm) throws Exception {
 		if (perm == Permissions.READ_WRITE) {
-			System.out.println("getting write lock");
 			if (locks[cache_idx].writeLock().isHeldByCurrentThread() ||
 					!locks[cache_idx].writeLock().tryLock(WRITE_LOCK_TIMEOUT_MS, TimeUnit.MICROSECONDS)) {
-				System.out.println("Failed");
 				throw new Exception("Unable to acquire write lock");
 			}
-			System.out.println("getting write lock worked + " + cache_idx);
 		}
 		else {
-			if (!locks[cache_idx].readLock().tryLock(READ_LOCK_TIMEOUT_MS, TimeUnit.MICROSECONDS)) {
+			if (locks[cache_idx].writeLock().isHeldByCurrentThread() ||
+					!locks[cache_idx].readLock().tryLock(READ_LOCK_TIMEOUT_MS, TimeUnit.MICROSECONDS)) {
 				throw new Exception("Unable to acquire read lock");
 			}
 		}
@@ -87,7 +85,10 @@ public class BufferPool {
 		}
 	}
 	
-	private boolean is_locked(int cache_idx) {
+	private boolean is_locked(int cache_idx, int tid) {
+		if (tids.get(cache_idx).size() == 1 && tids.get(cache_idx).contains((Integer) tid) && !dirty[cache_idx]) {
+			return false;
+		}
 		return locks[cache_idx].isWriteLocked() || locks[cache_idx].getReadLockCount() > 0;
 	}
 
@@ -111,24 +112,31 @@ public class BufferPool {
 			if (cache[i] != null && (cache[i].getTableId() == tableId && cache[i].getId() == pid)) {
 				if (tids.get(i).contains((Integer) tid)) {
 					// we already have a lock on this page
-					return cache[i];
 //					if (locks[i].isWriteLocked() && perm == Permissions.READ_WRITE) {
 //						return cache[i];
 //					}
 //					else if (locks[i].getReadLockCount() > 0 && perm == Permissions.READ_ONLY) {
 //						return cache[i];
 //					}
-//					else if (locks[i].isWriteLocked() && perm == Permissions.READ_ONLY) {
-//						// leave it as write locked
-//						return cache[i];
-//					}
-//					else if (locks[i].getReadLockCount() > 0 && perm == Permissions.READ_WRITE) {
-//						release_lock(i);
-//						// fall through to acquire a write lock on the page
-//					}
+					if (locks[i].isWriteLocked() && perm == Permissions.READ_ONLY) {
+						release_lock(i);
+						// fall through to downgrade to read lock
+					}
+					if (locks[i].getReadLockCount() > 0 && perm == Permissions.READ_WRITE) {
+						release_lock(i);
+						// fall through to acquire a write lock on the page
+					}
+					else {
+						return cache[i];
+					}
 				}
-				System.out.println(tid + " getting lock");
-				get_lock(i, perm);
+				try {
+					get_lock(i, perm);
+				}
+				catch (Exception e) {
+					transactionComplete(tid, false);
+					throw e;
+				}
 				tids.get(i).add(tid);
 				return cache[i];
 			}
@@ -137,22 +145,59 @@ public class BufferPool {
 		for (int i = 0; i < cache.length; i++) {
 			if (cache[i] == null) {
 				cache[i] = Database.getCatalog().getDbFile(tableId).readPage(pid);
-				get_lock(i, perm);
+				try {
+					get_lock(i, perm);
+				}
+				catch (Exception e) {
+					transactionComplete(tid, false);
+					throw e;
+				}
 				tids.get(i).add(tid);
 				return cache[i];
 			}
 		}
 		// this page was not in the cache, so try to evict another page
-		evictPage();
+		try {
+			evictPage(tid);
+		}
+		catch (Exception e) {
+			transactionComplete(tid, false);
+			throw e;
+		}
 		for (int i = 0; i < cache.length; i++) {
 			if (cache[i] == null) {
 				cache[i] = Database.getCatalog().getDbFile(tableId).readPage(pid);
-				get_lock(i, perm);
+				try {
+					get_lock(i, perm);
+				}
+				catch (Exception e) {
+					transactionComplete(tid, false);
+					throw e;
+				}
 				tids.get(i).add(tid);
 				return cache[i];
 			}
 		}
+		transactionComplete(tid, false);
 		throw new Exception("No available cache slots for new page");
+	}
+	
+	public HeapPage getPageInCache(int tid, int tableId, int pid, Permissions perm) throws Exception {
+		for (int i = 0; i < cache.length; i++) {
+			if (cache[i] != null && (cache[i].getTableId() == tableId && cache[i].getId() == pid)) {
+				if (tids.get(i).contains((Integer) tid)) {
+					// we already have a lock on this page
+					if (locks[i].isWriteLocked() || perm == Permissions.READ_ONLY) {
+						return cache[i];
+					}
+					else {
+						throw new Exception("Trying to write with a read lock");
+					}
+				}
+				throw new Exception("Trying to get page without lock");
+			}
+		}
+		throw new Exception("Trying to get page that isn't in the cache");
 	}
 
 	/**
@@ -230,26 +275,34 @@ public class BufferPool {
 	 */
 	public void insertTuple(int tid, int tableId, Tuple t) throws Exception {
 		// your code here
-		HeapFile f = Database.getCatalog().getDbFile(tableId);
-		for (int i = 0; i < f.getNumPages(); i++) {
-			HeapPage page = getPage(tid, tableId, i, Permissions.READ_WRITE);
-			if (!locks[i].isWriteLockedByCurrentThread()) {
-				// we don't have write permission
-				throw new Exception("We didn't have the write lock before?");
+		try {
+			HeapFile f = Database.getCatalog().getDbFile(tableId);
+			for (int i = 0; i < f.getNumPages(); i++) {
+				HeapPage page = getPageInCache(tid, tableId, i, Permissions.READ_WRITE);
+				if (!locks[i].isWriteLockedByCurrentThread()) {
+					// we don't have write permission
+					transactionComplete(tid, false);
+					throw new Exception("We didn't have the write lock before?");
+				}
+				if(page.addTuple(t)) {
+					dirty[i] = true;
+					return;
+				}
+				releasePage(tid, tableId, i);
 			}
-			if(page.addTuple(t)) {
-				dirty[i] = true;
-				return;
+			HeapPage hpage;
+			hpage = getPageInCache(tid, tableId, f.getNumPages(), Permissions.READ_WRITE);
+			hpage.addTuple(t);
+			for (int i = 0; i < cache.length; i++) {
+				if (cache[i] == hpage) {
+					dirty[i] = true;
+					break;
+				}
 			}
-			releasePage(tid, tableId, i);
 		}
-		HeapPage hpage = getPage(tid, tableId, f.getNumPages(), Permissions.READ_WRITE);
-		hpage.addTuple(t);
-		for (int i = 0; i < cache.length; i++) {
-			if (cache[i] == hpage) {
-				dirty[i] = true;
-				break;
-			}
+		catch (Exception e) {
+			transactionComplete(tid, false);
+			throw e;
 		}
 	}
 
@@ -265,15 +318,17 @@ public class BufferPool {
 	 */
 	public void deleteTuple(int tid, int tableId, Tuple t) throws Exception {
 		// your code here
-		HeapPage p = getPage(tid, tableId, t.getPid(), Permissions.READ_WRITE);
+		HeapPage p = getPageInCache(tid, tableId, t.getPid(), Permissions.READ_WRITE);
 		for (int i = 0; i < cache.length; i++) {
 			if (cache[i] != p) {
 				continue;
 			}
 			if (!locks[i].isWriteLockedByCurrentThread()) {
 				// we don't have write permission
+				transactionComplete(tid, false);
 				throw new Exception("We didn't have the write lock before?");
 			}
+			dirty[i] = true;
 		}
 		p.deleteTuple(t);
 	}
@@ -293,11 +348,14 @@ public class BufferPool {
 	 * Discards a page from the buffer pool. Flushes the page to disk to ensure
 	 * dirty pages are updated on disk.
 	 */
-	private synchronized void evictPage() throws Exception {
+	private synchronized void evictPage(int tid) throws Exception {
 		// your code here
 		for (int i = 0; i < cache.length; i++) {
 			int idx = (i + global_offset) % cache.length;
-			if (!is_locked(idx)) {
+			if (!is_locked(idx, tid)) {
+				if (tids.get(idx).size() == 1) {
+					release_lock(idx);
+				}
 				// we can evict this one
 				flushPage(cache[idx].getTableId(), cache[idx].getId());
 				cache[idx] = null;
